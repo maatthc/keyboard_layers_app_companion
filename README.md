@@ -300,7 +300,57 @@ Once you are done editing, download the PNG files, copy it to the `assets` folde
 
 - Verify the `usage_page` and `usage` values in `config.ini` match your keyboard's firmware configuration
 - Ensure your keyboard is connected and recognized by your operating system
-- On Linux, you may need to configure udev rules to access HID devices without root
+- On Linux, a `Permission denied` / no-device result is usually missing udev rules — see [Permission denied on Linux (udev rules)](#permission-denied-on-linux-udev-rules)
+
+### Permission denied on Linux (udev rules)
+
+The app reaches the keyboard through `/dev/hidraw*` (the python `hid` package binds to
+whichever HIDAPI it finds, which on most Linux distributions is `libhidapi-hidraw`), for
+both the USB raw-HID path and the ZMK Bluetooth path. Most distributions leave those
+nodes as `root:root 0600`, so the app cannot open the device unless it runs as root.
+
+Find the node belonging to your keyboard:
+
+```bash
+grep -H -E 'HID_NAME|HID_ID' /sys/class/hidraw/*/device/uevent
+```
+
+`HID_ID` is `<bus>:<VID>:<PID>`, zero-padded — bus `0003` is USB and `0005` is Bluetooth.
+For example `HID_ID=0005:00001D50:0000615E` is VID `1D50`, PID `615E` over Bluetooth.
+
+Create `/etc/udev/rules.d/70-keyboard-companion.rules` with your own VID and PID. Use
+**uppercase** hex, and drop the leading zeros — udev matching is case sensitive and
+`KERNELS` uses the four-digit form. The `????` wildcard matches any bus, so one rule
+covers the keyboard whether it is connected over USB or Bluetooth:
+
+```
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", KERNELS=="????:1D50:615E.*", MODE="0660", GROUP="plugdev"
+```
+
+Reload the rules and make sure your user is in `plugdev`:
+
+```bash
+sudo udevadm control --reload && sudo udevadm trigger -s hidraw
+sudo usermod -aG plugdev "$USER"   # log out and back in if you were not already a member
+```
+
+You can check that the rule matches without reconnecting anything — this is a dry run:
+
+```bash
+udevadm test /sys/class/hidraw/hidrawN 2>&1 | grep -E 'GROUP|MODE'   # your keyboard's node
+```
+
+Notes:
+
+- The `input` group is **not** involved. It governs `/dev/input/event*`, which this app
+  never reads, so joining it does not help — and it grants read access to every keystroke
+  on the machine.
+- For a Bluetooth keyboard the hidraw node is created by `uhid` and has no USB attributes,
+  so `ATTRS{idVendor}` will never match. Match on `KERNELS`, as above.
+- If your distribution ships the libusb HIDAPI backend instead, hidraw rules will not help;
+  you would need `SUBSYSTEM=="usb"` rules there.
+- `TAG+="uaccess"` instead of `MODE`/`GROUP` grants access to the locally logged-in user
+  rather than a group. If you use it, the file must sort before `73-seat-late.rules`.
 
 ### Bluetooth connection issues (ZMK)
 
