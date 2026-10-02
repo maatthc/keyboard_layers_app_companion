@@ -15,9 +15,10 @@ class Gui(App):
         super().__init__(**kwargs)
         self.conf = Config()
         self.listener = listener
+        self.updateTask = None
 
     def on_start(self):
-        asyncio.create_task(self.updateLayer())
+        self.updateTask = asyncio.create_task(self.updateLayer())
 
     def build(self):
         self.title = "Keyboard Layers App companion"
@@ -29,14 +30,23 @@ class Gui(App):
             try:
                 layer = self.listener.notify_changes()
                 if layer is not None:
-                    self.img.source = imageFolder + self.conf.layers[layer]
-                    print(f"Switched to layer {layer}: {self.conf.layers[layer]}")
-                await asyncio.sleep(0.1)
+                    if 0 <= layer < len(self.conf.layers):
+                        self.img.source = imageFolder + self.conf.layers[layer]
+                        print(f"Switched to layer {layer}: {self.conf.layers[layer]}")
+                    else:
+                        print(f"Ignoring layer {layer}: no image configured for it")
             except Exception as e:
                 print(f"Error: {e}")
+            # Outside the try: an error must not skip the sleep. Without a
+            # yield point here the loop starves the event loop, so the window
+            # stops responding and async_run() can never finish - the app
+            # hangs on close instead of exiting.
+            await asyncio.sleep(0.1)
 
     def on_stop(self, **kwargs):
         print("App closing..(did you press ESC?)")
+        if self.updateTask is not None:
+            self.updateTask.cancel()
         super().on_stop(**kwargs)
 
     async def start(self):
