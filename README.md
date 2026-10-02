@@ -89,25 +89,33 @@ Make sure you have Python 3.7 or higher installed, 3.13 is recommended. Pip is a
 
 Clone this repo and via terminal, `cd` to it. Then install the required Python packages:
 
-#### Using UV - Recommended
+#### --> Using UV - Recommended
 
 Install [UV](https://docs.astral.sh/uv/getting-started/installation/#installation-methos)
 
-Set up the environment:
-
+Then:
 `uv sync`
 
-Run:
 
-`uv run main.py`
-
-#### Using Pip
+#### --> Using Pip
 
 `pip install pipenv`
 
 `pipenv install`
 
+### Install application wrapper (macOS/Linux)
 
+This will install a script called *"companion"* in your PATH and can be called from anywhere:
+
+Linux:
+```
+python ./install_command.py
+```
+
+macOS:
+```
+sudo python ./install_command.py
+```
 
 ## Configuration
 
@@ -168,7 +176,7 @@ Advantage: layout is displayed with minimum latency.
 - macOS/Linux: run the following command from the repo folder:
 
 ```bash
-pipenv run python main.py
+companion
 ```
 
 ### Bluetooth (ZMK only)
@@ -179,7 +187,7 @@ Due to system restrictions on *macOS*, `root` privileges are required to access 
 
 
 ```bash
-sudo pipenv run python main.py --ble
+sudo companion --ble
 
 ```
 
@@ -187,10 +195,10 @@ The BLE option can be combined with other options, for example:
 
 ```bash
 # BLE + web server
-sudo pipenv run python main.py --ble --web
+sudo companion --ble --web
 
 # BLE + remote server
-sudo pipenv run python main.py --ble --server
+sudo companion --ble --server
 ```
 
 ### Remote Display - Web application
@@ -202,7 +210,7 @@ Disadvantage: layout changes might be slightly delayed due to network latency or
 - Windows: run `Keyboard Companion.exe --web` from the command line.
 - macOS/Linux: run the following command from the repo folder:
 
-`pipenv run python main.py --web [--server_ip] [--server_port]`
+`companion --web [--server_ip] [--server_port]`
 
 Run the server on the computer connected to the keyboard and open a browser on the remote device (tablet, mobile, desktop) to display the layout.
 
@@ -225,15 +233,15 @@ If no server IP or port is specified, the client will try to discover the server
 
 The IP address that the server binds to can be changed using the `--server_ip` option.
  
-On Windows, change `pipenv run python` to `Keyboard Companion.exe` in the commands below.
+On Windows, change `companion` to `Keyboard Companion.exe` in the commands below.
 
 Host:
 
-`pipenv run python main.py --server [--server_ip] [--server_port]`
+`companion --server [--server_ip] [--server_port]`
 
 Client:
 
-`pipenv run python main.py --client [--server_ip] [--server_port]`
+`companion --client [--server_ip] [--server_port]`
 
 
 ## Firmware Setup
