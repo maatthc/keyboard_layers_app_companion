@@ -1,0 +1,28 @@
+[project]
+name = "keyboard_layers_app_companion"
+version = "0.1.0"
+description = "App companion for visualizing the selected layer of ZMK / QMK / Vial powered keyboards"
+readme = "README.md"
+authors = [
+    { name = "maatthc", email = "maatthc" }
+]
+requires-python = "==3.13.*"
+dependencies = [
+    "aiohttp>=3.14.3",
+    "asyncio>=4.0.0",
+    "hid>=1.0.9",
+    "kivy[base]==2.3.1",
+    "pillow>=9.5.0,<11.0.0",
+    "tenacity==8.3.0",
+    "zeroconf>=0.150.0",
+]
+
+[tool.uv]
+package = false
+
+# [project.scripts]
+# qmk-layers-app-companion = "keyboard_layers_app_companion"
+
+[build-system]
+requires = ["uv_build>=0.12.2,<0.13.0"]
+build-backend = "uv_build"
