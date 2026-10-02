@@ -90,9 +90,24 @@ Make sure you have Python 3.7 or higher installed, 3.13 is recommended. Pip is a
 
 Clone this repo and via terminal, `cd` to it. Then install the required Python packages:
 
+#### Using UV - Recommended
+
+Install [UV](https://docs.astral.sh/uv/getting-started/installation/#installation-methos)
+
+Set up the environment:
+
+`uv sync`
+
+Run:
+
+`uv run main.py`
+
+#### Using Pip
+
 `pip install pipenv`
 
 `pipenv install`
+
 
 
 ## Configuration
