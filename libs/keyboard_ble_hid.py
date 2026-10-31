@@ -1,18 +1,25 @@
+import os
 import sys
+import time
 import hid
 from libs.config import Config
-from tenacity import retry, wait_exponential
 
 
 USAGE_PAGE = 0x01  # Generic Desktop
 USAGE_KEYBOARD = 0x06  # Keyboard
+
+# How often to look for the keyboard again while it is away. hid.enumerate()
+# scans sysfs, so calling it on every poll would stall the GUI event loop.
+RECONNECT_INTERVAL = 1.0
 
 
 class KeyboardBLEHID:
     def __init__(self):
         self.config = Config()
         self.hid = None
-        self.current_layer = 0
+        self.path = None
+        self.current_layer = None
+        self._last_reconnect = 0.0
 
         self.hid = self.find_device()
         if self.hid is None:
@@ -36,8 +43,10 @@ class KeyboardBLEHID:
         ]
 
         for dev in keyboards:
-            result = self.try_open(dev)
-            return result
+            device = self.try_open(dev)
+            if device is not None:
+                return device
+        return None
 
     def try_open(self, dev):
         path = dev.get("path", b"")
@@ -54,6 +63,7 @@ class KeyboardBLEHID:
         try:
             device = hid.Device(path=dev["path"])
             device.nonblocking = True
+            self.path = path
             print("  Opened successfully")
             return device
         except Exception as e:
@@ -100,7 +110,32 @@ On Linux, you may need to:
             print(f"  [{vid:04x}:{pid:04x}] {manufacturer} {product}")
             print(f"    page={usage_page:04x} usage={usage:04x}")
 
-    @retry(wait=wait_exponential(multiplier=1, min=1, max=10))
+    def close_device(self):
+        """Drop the handle so the next poll opens the keyboard afresh."""
+        if self.hid is not None:
+            try:
+                self.hid.close()
+            except Exception:
+                pass
+        self.hid = None
+        self.path = None
+
+    def reconnect(self):
+        """Look for the keyboard again, at most once every RECONNECT_INTERVAL."""
+        now = time.monotonic()
+        if now - self._last_reconnect < RECONNECT_INTERVAL:
+            return None
+        self._last_reconnect = now
+
+        self.hid = self.find_device()
+        if self.hid is not None:
+            # The keyboard may come back on the layer we last recorded. Forget
+            # it, so the first report after reconnecting always redraws rather
+            # than comparing equal and leaving a stale image on screen.
+            self.current_layer = None
+            print("Keyboard reconnected.")
+        return self.hid
+
     def notify_changes(self):
         """
         Embedded protocol
@@ -108,9 +143,19 @@ On Linux, you may need to:
         - Byte 1: Modifier keys
         - Byte 2: Reserved/Layer number
         - Bytes 3+: Key codes
+
+        A Bluetooth keyboard that drops its link comes back on a *different*
+        /dev/hidraw node, which leaves this handle pointing at a device that no
+        longer exists. Reads on it then sit there quietly forever, so watch the
+        node itself and re-open when it goes away.
         """
-        if self.hid is None:
+        if self.path is not None and not os.path.exists(self.path):
+            print(f"{self.path} is gone, waiting for the keyboard to come back..")
+            self.close_device()
+
+        if self.hid is None and self.reconnect() is None:
             return None
+
         try:
             data = self.hid.read(64, timeout=100)
             if not data or len(data) < 3:
@@ -127,10 +172,12 @@ On Linux, you may need to:
                 print(f"Layer change: {layer}")
                 return layer
 
-        except hid.HIDException:
-            print("Device disconnected or not accessible, retrying..")
-            self.hid = self.find_device() or self.hid
-            raise
+        except hid.HIDException as e:
+            # Never hold on to a handle we could not re-open: the caller polls
+            # us again shortly, and reconnect() is what finds the new node.
+            print(f"Device disconnected or not accessible ({e}), re-opening..")
+            self.close_device()
+            return None
 
         except Exception as e:
             print(f"Error reading Bluetooth HID: {e}")
